@@ -1,84 +1,183 @@
-import { Text, View, StyleSheet } from "react-native";
-import { Image } from "expo-image"
-import { Ionicons } from "@expo/vector-icons"
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import React, { useEffect, useState } from "react";
+import {
+    ActivityIndicator,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
-// npm install expo-image (usar este código no terminal)
+interface Produto {
+  id_produto: number;
+  nome: string;
+  descricao: string;
+  preco: number;
+  foto: string;
+}
 
-const foto = require("../assets/images/chiquinho.webp")
+function Main() {
+  const insets = useSafeAreaInsets();
+  const [pesquisa, setPesquisa] = useState("");
+  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-export default function Index() {
+  async function carregarProdutos(){
+    try { 
+      const resposta = await fetch("http://10.210.87.160/produtos/estoque")
+      const dados = await resposta.json()
+      setProdutos(dados);
+    } catch (erro) {
+      console.log(erro)
+    } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+}
+  useEffect(() => {
+    carregarProdutos();
+  }, []);
+
+  const recarregarProdutos = () => {
+    setRefreshing(true);
+    carregarProdutos();
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container} >
-      <View style = {styles.containerImg}>
-        <Image source = {foto} style={styles.estiloFoto}></Image>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + 10,
+          paddingBottom: insets.bottom + 10,
+        },
+      ]}
+    >
+      <View style={styles.bordaPesquisar}>
+        <Text style={styles.textoPesquisar}>Pesquisar: </Text>
+        <TextInput
+          style={styles.inputPesquisar}
+          value={pesquisa}
+          onChangeText={setPesquisa}
+          placeholder="Digite aqui..."
+          placeholderTextColor="#ccc"
+        />
+        <Ionicons
+          name="search"
+          size={24}
+          color="#888888"
+          style={styles.iconePesquisar}
+        />
       </View>
-      <View style = {styles.containerConteudo}>
-        <View style = {styles.containerNome}>
-          <Text style={styles.nome}>Hayssa Linda</Text>
-        </View>
-        <Text style = {styles.linha}>
-          _______________________________________
-        </Text>
-        <View style = {styles.containerDados}>
-          <Ionicons name="person" size={24} color="white" />
-          <Text style = {styles.textoDados}>17 anos</Text>
-        </View>
-        <View style = {styles.containerDados}>
-          <Ionicons name="mail" size={24} color="white" />
-          <Text style = {styles.textoDados}>hayssa.linda@escola.pr.gov.br</Text>
-        </View>
-        <View style = {styles.containerDados}>
-          <Ionicons name="call" size={24} color="white" />
-          <Text style = {styles.textoDados}>(42) 9728-7826</Text>
-        </View>
-        <View style = {styles.containerDados}>
-          <Ionicons name="home" size={24} color="white" />
-          <Text style = {styles.textoDados}>Campo Largo / PR</Text>
-        </View>
-      </View>
+
+      <FlatList
+        data={produtos.filter((produto) =>
+          produto.nome.toLowerCase().includes(pesquisa.toLowerCase())
+        )}
+        keyExtractor={(item) => item.id_produto.toString()}
+        renderItem={({ item }) => (
+          <View style={styles.item}>
+            <Image
+              source={{ uri: item.foto }}
+              style={styles.imagem}
+              contentFit="cover"
+            />
+            <View style={styles.info}>
+              <Text style={styles.nome}>{item.nome}</Text>
+              <Text style={styles.descricao}>{item.descricao}</Text>
+            </View>
+            <Text style={styles.preco}>R$ {item.preco.toFixed(2).replace(".", ",")}</Text>
+          </View>
+        )}
+        contentContainerStyle={styles.lista}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={recarregarProdutos} />
+        }
+      />
     </View>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <Main />
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "black"
+    backgroundColor: "#fff",
   },
-  containerImg: {
-    flex: 1,
-    paddingTop: 60,
-  },
-  estiloFoto: {
-    width: 300,
-    height: 300,
-  },
-  containerConteudo: {
-    flex: 1
-  },
-  containerNome:{
-    alignItems:"center",
-  },
-  nome: {
-    fontSize: 40,
-    color: "pink",
-    fontWeight: "bold",
-  },
-  linha:{
-    color: "white",
-    fontSize: 20,
-    marginBottom: 20
-  },
-  containerDados: {
-    marginBottom: 8,
+  bordaPesquisar: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 5,
   },
-  textoDados: {
+  textoPesquisar: {
+    marginLeft: 20,
+  },
+  inputPesquisar: {
+    flex: 1,
+    borderWidth: 0.5,
+    borderColor: "#888888",
+    borderRadius: 25,
+    paddingLeft: 20,
+    paddingRight: 20,
+    width: 200,
+  },
+  iconePesquisar: {
+    marginRight: 20,
     marginLeft: 10,
-    color: "pink",
-    fontSize: 24,
-  }
-})
+  },
+  lista: {
+    paddingHorizontal: 16,
+  },
+  item: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f9f9f9",
+    padding: 10,
+    marginVertical: 6,
+    borderRadius: 10,
+    elevation: 2,
+  },
+  imagem: {
+    width: 75,
+    height: 60,
+    marginRight: 10,
+    borderRadius: 6,
+  },
+  info: {
+    flex: 1,
+  },
+  nome: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  descricao: {
+    fontSize: 12,
+    color: "#555",
+  },
+  preco: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#2e7d32",
+    marginLeft: 8,
+  },
+});
